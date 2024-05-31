@@ -16,7 +16,7 @@ git 'https://github.com/bobademayur/cloudformation.git' // Update with your repo
         }
         stage('Deploy CloudFormation Stack') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws_credentials']]) {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                     sh """
                     aws cloudformation deploy \
                         --template-file $TEMPLATE_FILE \

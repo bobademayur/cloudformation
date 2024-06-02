@@ -1,31 +1,11 @@
-pipeline {
+pipeline{
     agent any
- 
-    environment {
-        AWS_REGION = 'us-west-1' // Update with your desired region
-        STACK_NAME = 'MyEC2Stack'
-        TEMPLATE_FILE = './cfn-template/ec2-template.yaml'
-    }
- 
     stages {
-        stage('Checkout') {
+        stage('submit stack') {
             steps {
-                // Clone the repository
-git 'https://github.com/bobademayur/cloudformation.git' // Update with your repository URL
+                sh "aws cloudformation create-stack --stack-name ec2instance --template-body file://ec2cft.yaml --region 'us-east-1'"
             }
         }
-        stage('Deploy CloudFormation Stack') {
-            steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
-                    sh """
-                    aws cloudformation deploy \
-                        --template-file $TEMPLATE_FILE \
-                        --stack-name $STACK_NAME \
-                        --region $AWS_REGION \
-                        --capabilities CAPABILITY_NAMED_IAM
-                    """
-                }
-            }
-        }
+
     }
 }

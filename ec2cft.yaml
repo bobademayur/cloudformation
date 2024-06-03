@@ -1,9 +1,97 @@
----
+AWSTemplateFormatVersion:
+"2010-09-09"
+Description: CloudFormation template to create an Auto Scaling Group with an Application Load Balancer
 
 Resources:
-  MyInstance:
-    Type: AWS::EC2::Instance
+
+  MySecurityGroup:
+   Type: AWS::EC2::SecurityGroup
+   Properties:
+    GroupName: sg-for-ec2
+    GroupDescription: Enable port 80
+    SecurityGroupIngress:
+     - IpProtocol: tcp
+       FromPort: 80
+       ToPort: 80
+       CidrIp: 0.0.0.0/0
+
+  MyLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
     Properties:
-      AvailabilityZone: us-east-1a
-      ImageId: ami-07caf09b362be10b8
+      LaunchTemplateName: MyASG-Template
+      LaunchTemplateData: 
+        SecurityGroupIds:
+          - !Ref MySecurityGroup
+        UserData: 
+           Fn::Base64: !Sub | 
+            #!/bin/bash
+            echo "Hello, World from $(hostname -f)" > /var/www/html/index.html
+            yum install -y httpd
+            systemctl start httpd
+            systemctl enable httpd
       InstanceType: t2.micro
+      ImageId: ami-00beae93a2d981137
+
+
+  MyAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties: 
+      AutoScalingGroupName: MyASG
+      MinSize: 2
+      MaxSize: 3
+      DesiredCapacity: 2
+      LaunchTemplate:
+        LaunchTemplateId: !Ref MyLaunchTemplate
+        Version: !GetAtt MyLaunchTemplate.LatestVersionNumber
+      VPCZoneIdentifier:
+       - subnet-0e1bbd6544b12f55d
+       - subnet-05f48ce96343ca6c4
+      TargetGroupARNs:
+       - !Ref MyTargetGroup
+
+  MyTargetGroup:
+    Type:    AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties: 
+      Name: MyTargetGroup
+      Port: 80
+      Protocol: HTTP
+      VpcId: vpc-018de1caf38bc8133
+      TargetType: Instance
+      HealthCheckEnabled: true 
+      HealthCheckPath: /
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      UnhealthyThresholdCount: 2      
+
+
+  MyLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: MyLoadBalancer
+      Scheme: internet-facing
+      Subnets:
+        - subnet-0e1bbd6544b12f55d
+        - subnet-05f48ce96343ca6c4
+      SecurityGroups: 
+        - !Ref MySecurityGroup
+
+
+  MyListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref MyTargetGroup
+      LoadBalancerArn: !Ref MyLoadBalancer
+        Port: 80
+        Protocol: HTTP
+
+
+
+  Outputs: 
+    LoadBalancerDNSName:
+      Description: "DNS name of the load balancer"
+      Value: !GetAtt
+        - MyLoadBalancer
+        - DNSName                    

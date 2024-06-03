@@ -1,41 +1,41 @@
-AWSTemplateFormatVersion:
-'2010-09-09'
+AWSTemplateFormatVersion: "2010-09-09"
 Description: CloudFormation template to create an Auto Scaling Group with an Application Load Balancer
-
+ 
 Resources:
-
+  # Security Group for EC2
   MySecurityGroup:
-   Type: AWS::EC2::SecurityGroup
-   Properties:
-    GroupName: sg-for-ec2
-    GroupDescription: Enable port 80
-    SecurityGroupIngress:
-     - IpProtocol: tcp
-       FromPort: 80
-       ToPort: 80
-       CidrIp: 0.0.0.0/0
-
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: sg-for-ec2
+      GroupDescription: Enable port 80
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          
+  # Launch Template for ASG
   MyLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
       LaunchTemplateName: MyASG-Template
-      LaunchTemplateData: 
+      LaunchTemplateData:
         SecurityGroupIds:
           - !Ref MySecurityGroup
-        UserData: 
-           Fn::Base64: !Sub | 
+        UserData:
+          Fn::Base64: !Sub |
             #!/bin/bash
-            echo "Hello, World from $(hostname -f)" > /var/www/html/index.html
+            echo "Hello, World!" > /var/www/html/index.html
             yum install -y httpd
             systemctl start httpd
             systemctl enable httpd
-      InstanceType: t2.micro
-      ImageId: ami-00beae93a2d981137
-
-
+        InstanceType: t2.micro
+        ImageId: ami-00beae93a2d981137 # Amazon Linux 2 AMI ID (update to latest)
+ 
+  # Auto Scaling Group
   MyAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
-    Properties: 
+    Properties:
       AutoScalingGroupName: MyASG
       MinSize: 2
       MaxSize: 3
@@ -44,39 +44,40 @@ Resources:
         LaunchTemplateId: !Ref MyLaunchTemplate
         Version: !GetAtt MyLaunchTemplate.LatestVersionNumber
       VPCZoneIdentifier:
-       - subnet-0e1bbd6544b12f55d
-       - subnet-05f48ce96343ca6c4
+        - subnet-0e1bbd6544b12f55d # Update with your subnet id
+        - subnet-05f48ce96343ca6c4 # Update with your subnet id
       TargetGroupARNs:
-       - !Ref MyTargetGroup
-
+        - !Ref MyTargetGroup
+ 
+  # Target Group for ASG
   MyTargetGroup:
-    Type:    AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties: 
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
       Name: MyTargetGroup
       Port: 80
       Protocol: HTTP
-      VpcId: vpc-018de1caf38bc8133
-      TargetType: Instance
-      HealthCheckEnabled: true 
+      VpcId: vpc-018de1caf38bc8133 # Update with your VPC id
+      TargetType: instance
+      HealthCheckEnabled: true
       HealthCheckPath: /
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 5
-      UnhealthyThresholdCount: 2      
-
-
+      UnhealthyThresholdCount: 2
+      
+  # Application Load Balancer
   MyLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Name: MyLoadBalancer
       Scheme: internet-facing
       Subnets:
-        - subnet-0e1bbd6544b12f55d
-        - subnet-05f48ce96343ca6c4
-      SecurityGroups: 
+        - subnet-0e1bbd6544b12f55d # Update with your subnet id
+        - subnet-05f48ce96343ca6c4 # Update with your subnet id
+      SecurityGroups:
         - !Ref MySecurityGroup
-
-
+ 
+  # Listener for Load Balancer
   MyListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -84,14 +85,12 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref MyTargetGroup
       LoadBalancerArn: !Ref MyLoadBalancer
-        Port: 80
-        Protocol: HTTP
-
-
-
-  Outputs: 
-    LoadBalancerDNSName:
-      Description: "DNS name of the load balancer"
-      Value: !GetAtt
-        - MyLoadBalancer
-        - DNSName                    
+      Port: 80
+      Protocol: HTTP
+ 
+Outputs:
+  LoadBalancerDNSName:
+    Description: "DNS Name of the load balancer"
+    Value: !GetAtt
+      - MyLoadBalancer
+      - DNSName                    

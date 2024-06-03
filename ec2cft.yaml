@@ -6,7 +6,6 @@ Resources:
   MySecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: SGForEc2
       GroupDescription: Enable port 80
       SecurityGroupIngress:
         - IpProtocol: tcp

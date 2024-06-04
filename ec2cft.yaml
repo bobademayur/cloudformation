@@ -1,26 +1,28 @@
-AWSTemplateFormatVersion: "2010-09-09"
-Description: CloudFormation template to create an Auto Scaling Group with an Application Load Balancer
- 
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  LatestAmiId:
+    Description: Region specific image from the Parameter Store
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+  InstanceType:
+    Description: Amazon EC2 instance type for the instances
+    Type: String
+    AllowedValues:
+      - t2.micro
+      - t3.small
+      - t3.medium
+    Default: t2.micro
+  Subnets:
+    Type: 'List<AWS::EC2::Subnet::Id>'
+    Description: A list of subnets for the Auto Scaling group
 Resources:
-  # Security Group for EC2
-  MySecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Enable port 80
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-          
-  # Launch Template for ASG
   MyLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
-    Properties:
-      LaunchTemplateName: MyASG-Template
+    Properties: 
+      LaunchTemplateName: MyLaunchTemplate
       LaunchTemplateData:
-        SecurityGroupIds:
-          - !Ref MySecurityGroup
+        ImageId: !Ref LatestAmiId
+        InstanceType: !Ref InstanceType
         UserData:
           Fn::Base64: !Sub |
             #!/bin/bash
@@ -28,68 +30,14 @@ Resources:
             yum install -y httpd
             systemctl start httpd
             systemctl enable httpd
-        InstanceType: t2.micro
-        ImageId: ami-00beae93a2d981137 # Amazon Linux 2 AMI ID (update to latest)
- 
-  # Auto Scaling Group
-  MyAutoScalingGroup:
+
+
+  MyASG:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      AutoScalingGroupName: MyASG
-      MinSize: 2
-      MaxSize: 3
-      DesiredCapacity: 2
       LaunchTemplate:
         LaunchTemplateId: !Ref MyLaunchTemplate
         Version: !GetAtt MyLaunchTemplate.LatestVersionNumber
-      VPCZoneIdentifier:
-        - subnet-0e1bbd6544b12f55d # Update with your subnet id
-        - subnet-05f48ce96343ca6c4 # Update with your subnet id
-      TargetGroupARNs:
-        - !Ref MyTargetGroup
- 
-  # Target Group for ASG
-  MyTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      Name: MyTargetGroup
-      Port: 80
-      Protocol: HTTP
-      VpcId: vpc-018de1caf38bc8133 # Update with your VPC id
-      TargetType: instance
-      HealthCheckEnabled: true
-      HealthCheckPath: /
-      HealthCheckIntervalSeconds: 30
-      HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 5
-      UnhealthyThresholdCount: 2
-      
-  # Application Load Balancer
-  MyLoadBalancer:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-    Properties:
-      Name: MyLoadBalancer
-      Scheme: internet-facing
-      Subnets:
-        - subnet-0e1bbd6544b12f55d # Update with your subnet id
-        - subnet-05f48ce96343ca6c4 # Update with your subnet id
-      SecurityGroups:
-        - !Ref MySecurityGroup
- 
-  # Listener for Load Balancer
-  MyListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref MyTargetGroup
-      LoadBalancerArn: !Ref MyLoadBalancer
-      Port: 80
-      Protocol: HTTP
- 
-Outputs:
-  LoadBalancerDNSName:
-    Description: "DNS Name of the load balancer"
-    Value: !GetAtt
-      - MyLoadBalancer
-      - DNSName                    
+      MaxSize: '1'
+      MinSize: '1'
+      VPCZoneIdentifier: !Ref Subnets                  

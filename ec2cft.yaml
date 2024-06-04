@@ -38,4 +38,4 @@ Resources:
         Version: !GetAtt MyLaunchTemplate.LatestVersionNumber
       MaxSize: '1'
       MinSize: '1'
-      VPCZoneIdentifier: !Ref Subnets                  
+                       

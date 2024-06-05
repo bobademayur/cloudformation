@@ -1,41 +1,115 @@
 AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to create an Auto Scaling group with a greeting message.
+ 
 Parameters:
-  LatestAmiId:
-    Description: Region specific image from the Parameter Store
-    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
-    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
-  InstanceType:
-    Description: Amazon EC2 instance type for the instances
+  VPCId:
     Type: String
-    AllowedValues:
-      - t2.micro
-      - t3.small
-      - t3.medium
-    Default: t2.micro
-
+    Default: 'vpc-018de1caf38bc8133'
+    Description: VPC ID where the instances will be launched.
+ 
+  SubnetId1:
+    Type: String
+    Default: 'subnet-0e1bbd6544b12f55d'
+    Description: First subnet ID for the Auto Scaling group.
+ 
+  SubnetId2:
+    Type: String
+    Default: 'subnet-05f48ce96343ca6c4'
+    Description: Second subnet ID for the Auto Scaling group.
+ 
+  AMIId:
+    Type: String
+    Default: 'ami-00beae93a2d981137'
+    Description: AMI ID to use for the EC2 instances.
+ 
+  InstanceType:
+    Type: String
+    Default: 't2.micro'
+    Description: EC2 instance type.
+ 
+  KeyPairName:
+    Type: String
+    Default: 'MyKey'
+    Description: Key pair name for SSH access to the instances.
+ 
 Resources:
-  MyLaunchTemplate:
-    Type: AWS::EC2::LaunchTemplate
-    Properties: 
-      LaunchTemplateName: MyLaunchTemplate
-      LaunchTemplateData:
-        ImageId: !Ref LatestAmiId
-        InstanceType: !Ref InstanceType
-        UserData:
-          Fn::Base64: !Sub |
-            #!/bin/bash
-            echo "Hello, World!" > /var/www/html/index.html
-            yum install -y httpd
-            systemctl start httpd
-            systemctl enable httpd
-
-
-  MyASG:
-    Type: AWS::AutoScaling::AutoScalingGroup
+  WebServerSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      LaunchTemplate:
-        LaunchTemplateId: !Ref MyLaunchTemplate
-        Version: !GetAtt MyLaunchTemplate.LatestVersionNumber
-      MaxSize: '1'
-      MinSize: '1'
+      GroupDescription: Enable HTTP access
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+ 
+  LaunchConfiguration:
+    Type: 'AWS::AutoScaling::LaunchConfiguration'
+    Properties:
+      ImageId: !Ref AMIId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPairName
+      SecurityGroups:
+        - !Ref WebServerSecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          echo "Hello world" > /var/www/html/index.html
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+ 
+  AutoScalingGroup:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    Properties:
+      VPCZoneIdentifier:
+        - !Ref SubnetId1
+        - !Ref SubnetId2
+      LaunchConfigurationName: !Ref LaunchConfiguration
+      MinSize: '2'
+      MaxSize: '3'
+      DesiredCapacity: '2'
+      TargetGroupARNs:
+        - Ref: WebServerTargetGroup
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+ 
+  WebServerTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      VpcId: !Ref VPCId
+      Protocol: HTTP
+      Port: 80
+      TargetType: instance
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: 80
+      HealthCheckPath: /
+      Matcher:
+        HttpCode: 200
+      Name: 'WebServerTargetGroup'
+ 
+  LoadBalancer:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      Subnets:
+        - !Ref SubnetId1
+        - !Ref SubnetId2
+      SecurityGroups:
+        - !Ref WebServerSecurityGroup
+ 
+  Listener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Protocol: HTTP
+      Port: 80
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref WebServerTargetGroup
+ 
+Outputs:
+  LoadBalancerDNSName:
+    Description: DNS name of the load balancer
+    Value: !GetAtt [LoadBalancer, DNSName]
                        

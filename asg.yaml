@@ -45,7 +45,7 @@ Resources:
           CidrIp: 0.0.0.0/0
  
    ASGLaunchTemplate:
-    Type: AWS::EC2::LaunchTemplate
+    Type: 'AWS::EC2::LaunchTemplate'
     Properties:
       LaunchTemplateName: ASG-Template
       LaunchTemplateData:

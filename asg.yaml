@@ -44,7 +44,7 @@ Resources:
           ToPort: 80
           CidrIp: 0.0.0.0/0
  
-   ASGLaunchTemplate:
+  ASGLaunchTemplate:
     Type: 'AWS::EC2::LaunchTemplate'
     Properties:
       LaunchTemplateName: ASG-Template
